@@ -1,40 +1,31 @@
 #!/usr/bin/python3
-'''
-Index File
-'''
-
-from flask import jsonify
+"""
+    This is the index page handler for Flask.
+"""
 from api.v1.views import app_views
-from api.v1.app import storage
-from models.state import State
-from models.city import City
-from models.user import User
-from models.place import Place
-from models.review import Review
-from models.amenity import Amenity
+from models import storage
 
-classes = {'states': State,
-           'cities': City,
-           'users': User,
-           'places': Place,
-           'reviews': Review,
-           'amenities': Amenity}
+classes = {"amenities": "Amenity",
+           "cities": "City",
+           "places": "Place",
+           "reviews": "Review",
+           "states": "State",
+           "users": "User"}
 
 
 @app_views.route('/status')
-def status_route():
-    '''returns a JSON status info'''
-    data = {
-            "status": "OK"
-            }
-    return jsonify(data)
+def status():
+    """
+        Flask route at /status.
+        Displays the status of the API.
+    """
+    return {"status": "OK"}
 
 
 @app_views.route('/stats')
-def count_objects():
-    '''retrieves the number of each objects by type'''
-    stats = {}
-    for k, v in classes.items():
-        amount = storage.count(v)
-        stats[k] = amount
-    return jsonify(stats)
+def stats():
+    """
+        Flask route at /stats.
+        Displays the number of each objects by type.
+    """
+    return {k: storage.count(v) for k, v in classes.items()}

@@ -1,69 +1,52 @@
 #!/usr/bin/python3
-'''
-Create a new view for Amenity objects that handles
-all default RESTFul API actions
-'''
-from models import storage
-from models.amenity import Amenity
+"""
+    This is the amenities page handler for Flask.
+"""
 from api.v1.views import app_views
-from flask import jsonify, abort, request
+from models import storage
+from flask import abort, jsonify, request
+
+from models.amenity import Amenity
 
 
-@app_views.route('/amenities', methods=['GET'],
-                 strict_slashes=False)
-def get_full_amenity_method():
-    new_dict = []
-    for obj in storage.all(Amenity).values():
-        new_dict.append(obj.to_dict())
-    return jsonify(new_dict)
+@app_views.route('/amenities', methods=['GET', 'POST'])
+def amenities():
+    """
+        Flask route at /amenities.
+    """
+    if request.method == 'POST':
+        kwargs = request.get_json()
+        if not kwargs:
+            return {"error": "Not a JSON"}, 400
+        if "name" not in kwargs:
+            return {"error": "Missing name"}, 400
+        new_amnt = Amenity(**kwargs)
+        new_amnt.save()
+        return new_amnt.to_dict(), 201
+
+    elif request.method == 'GET':
+        return jsonify([a.to_dict() for a in storage.all("Amenity").values()])
 
 
-@app_views.route('/amenities/<amenity_id>', methods=['GET'],
-                 strict_slashes=False)
-def get_amenity_method(amenity_id):
-    amnit = storage.get(Amenity, amenity_id)
-    if amnit is None:
-        abort(404)
-    return jsonify(amnit.to_dict())
+@app_views.route('/amenities/<id>', methods=['GET', 'DELETE', 'PUT'])
+def amenities_id(id):
+    """
+        Flask route at /amenities/<id>.
+    """
+    amnt = storage.get(Amenity, id)
+    if (amnt):
+        if request.method == 'DELETE':
+            amnt.delete()
+            storage.save()
+            return {}, 200
 
-
-@app_views.route('/amenities/<amenity_id>', methods=['DELETE'],
-                 strict_slashes=False)
-def delete_amenity_method(amenity_id):
-    if amenity_id is None:
-        abort(404)
-    amnit = storage.get(Amenity, amenity_id)
-    if amnit is None:
-        abort(404)
-    amnit.delete()
-    storage.save()
-    return jsonify({}), 200
-
-
-@app_views.route('/amenities', methods=['POST'],
-                 strict_slashes=False)
-def post_amenity_method():
-    res = request.get_json()
-    if type(res) != dict:
-        return abort(400, {'message': 'Not a JSON'})
-    if 'name' not in res:
-        return abort(400, {'message': 'Missing name'})
-    new_amnit = Amenity(**res)
-    new_amnit.save()
-    return jsonify(new_amnit.to_dict()), 201
-
-
-@app_views.route('/amenities/<amenity_id>', methods=['PUT'],
-                 strict_slashes=False)
-def put_amenity_method(amenity_id):
-    amnit = storage.get(Amenity, amenity_id)
-    if amnit is None:
-        abort(404)
-    res = request.get_json()
-    if type(res) != dict:
-        return abort(400, {'message': 'Not a JSON'})
-    for key, value in res.items():
-        if key not in ["id", "created_at", "updated_at"]:
-            setattr(amnit, key, value)
-    storage.save()
-    return jsonify(amnit.to_dict()), 200
+        elif request.method == 'PUT':
+            kwargs = request.get_json()
+            if not kwargs:
+                return {"error": "Not a JSON"}, 400
+            for k, v in kwargs.items():
+                if k not in ["id", "created_at", "updated_at"]:
+                    setattr(amnt, k, v)
+            amnt.save()
+        return amnt.to_dict()
+    abort(404)

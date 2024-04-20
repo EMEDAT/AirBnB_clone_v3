@@ -1,89 +1,64 @@
 #!/usr/bin/python3
-'''
-Create a new view for Place objects that handles
-all default RESTFul API actions
-'''
-from models import storage
-from models.review import Review
-from models.place import Place
-from models.user import User
+"""
+    This is the places reviews page handler for Flask.
+"""
+from api.v1.views.places import places_id
 from api.v1.views import app_views
-from flask import jsonify, abort, request
+from models import storage
+from flask import abort, jsonify, request
+
+from models.place import Place
+from models.review import Review
+from models.user import User
 
 
-@app_views.route('/places/<place_id>/reviews', methods=['GET'],
-                 strict_slashes=False)
-def get_place_review_method(place_id):
-    if place_id is None:
-        abort(404)
-    place = storage.get(Place, place_id)
-    if place is None:
-        abort(404)
-    return jsonify([review.to_dict() for review in place.reviews])
+@app_views.route('/places/<id>/reviews', methods=['GET', 'POST'])
+def places_id_reviews(id):
+    """
+        Flask route at /places/<id>/reviews.
+    """
+    place = storage.get(Place, id)
+    if (place):
+        if request.method == 'POST':
+            kwargs = request.get_json()
+            if not kwargs:
+                return {"error": "Not a JSON"}, 400
+            if "user_id" not in kwargs:
+                return {"error": "Missing user_id"}, 400
+
+            user = storage.get(User, kwargs.get("user_id", None))
+            if (user):
+                if "text" not in kwargs:
+                    return {"error": "Missing text"}, 400
+                new_review = Review(place_id=id, **kwargs)
+                new_review.save()
+                return new_review.to_dict(), 201
+
+        elif request.method == 'GET':
+            return jsonify([r.to_dict() for r in place.reviews])
+    abort(404)
 
 
-@app_views.route('/reviews/<review_id>', methods=['GET'],
-                 strict_slashes=False)
-def get_review_method(review_id):
-    if review_id is None:
-        abort(404)
-    review = storage.get(Review, review_id)
-    if review is None:
-        abort(404)
-    return jsonify(review.to_dict())
+@app_views.route('/reviews/<id>', methods=['GET', 'DELETE', 'PUT'])
+def reviews_id(id):
+    """
+        Flask route at /reviews/<id>.
+    """
+    review = storage.get(Review, id)
+    if (review):
+        if request.method == 'DELETE':
+            review.delete()
+            storage.save()
+            return {}, 200
 
-
-@app_views.route('/reviews/<review_id>', methods=['DELETE'],
-                 strict_slashes=False)
-def del_review_method(review_id):
-    if review_id is None:
-        abort(404)
-    review = storage.get(Review, review_id)
-    if review is None:
-        abort(404)
-    review.delete()
-    storage.save()
-    return jsonify({}), 200
-
-
-@app_views.route('/places/<place_id>/reviews', methods=['POST'],
-                 strict_slashes=False)
-def post_review_method(place_id):
-    if place_id is None:
-        abort(404)
-    place = storage.get(Place, place_id)
-    if place is None:
-        abort(404)
-    res = request.get_json()
-    if type(res) != dict:
-        abort(400, {'message': 'Not a JSON'})
-    if 'user_id' not in res:
-        abort(400, {'message': 'Missing user_id'})
-    user = storage.get(User, res['user_id'])
-    if user is None:
-        abort(404)
-    if 'text' not in res:
-        abort(400, {'message': 'Missing text'})
-    new_review = Review(**res)
-    new_review.place_id = place_id
-    new_review.save()
-    return jsonify(new_review.to_dict()), 201
-
-
-@app_views.route('/reviews/<review_id>', methods=['PUT'],
-                 strict_slashes=False)
-def put_review_method(review_id):
-    if review_id is None:
-        abort(404)
-    review = storage.get(Review, review_id)
-    if review is None:
-        abort(404)
-    res = request.get_json()
-    if type(res) != dict:
-        return abort(400, {'message': 'Not a JSON'})
-    for key, value in res.items():
-        if key not in ["id", "user_id",
-                       "place_id", "created_at", "updated_at"]:
-            setattr(review, key, value)
-    storage.save()
-    return jsonify(review.to_dict()), 200
+        elif request.method == 'PUT':
+            kwargs = request.get_json()
+            if not kwargs:
+                return {"error": "Not a JSON"}, 400
+            for k, v in kwargs.items():
+                if k not in ["id", "user_id", "place_id",
+                             "created_at", "updated_at"]:
+                    setattr(review, k, v)
+            review.save()
+        return review.to_dict()
+    abort(404)
