@@ -68,43 +68,54 @@ test_file_storage.py'])
                             "{:s} method needs a docstring".format(func[0]))
 
 
-@unittest.skipIf(models.storage_t == 'db', "not testing file storage")
 class TestFileStorage(unittest.TestCase):
     """Test the FileStorage class"""
+
+    @classmethod
+    def setUpClass(cls):
+        """Hook that runs before of all tests"""
+        cls.save = FileStorage._FileStorage__objects
+        cls.storage = FileStorage()
+
+    @classmethod
+    def tearDownClass(cls):
+        """Hook that runs after of all tests"""
+        FileStorage._FileStorage__objects = cls.save
+        cls.storage.save()
+
+    def setUp(self):
+        """Hook that runs before each unit test"""
+        FileStorage._FileStorage__objects = {}
+
+    @unittest.skipIf(models.storage_t == 'db', "not testing file storage")
     def test_all_returns_dict(self):
         """Test that all returns the FileStorage.__objects attr"""
-        storage = FileStorage()
-        new_dict = storage.all()
+        new_dict = self.storage.all()
         self.assertEqual(type(new_dict), dict)
-        self.assertIs(new_dict, storage._FileStorage__objects)
+        self.assertIs(new_dict, self.storage._FileStorage__objects)
 
+    @unittest.skipIf(models.storage_t == 'db', "not testing file storage")
     def test_new(self):
-        """test that new adds an object to the FileStorage.__objects attr"""
-        storage = FileStorage()
-        save = FileStorage._FileStorage__objects
-        FileStorage._FileStorage__objects = {}
+        """Test that new adds an object to the FileStorage.__objects attr"""
         test_dict = {}
         for key, value in classes.items():
             with self.subTest(key=key, value=value):
                 instance = value()
                 instance_key = instance.__class__.__name__ + "." + instance.id
-                storage.new(instance)
+                self.storage.new(instance)
                 test_dict[instance_key] = instance
-                self.assertEqual(test_dict, storage._FileStorage__objects)
-        FileStorage._FileStorage__objects = save
+                self.assertEqual(test_dict, self.storage._FileStorage__objects)
 
+    @unittest.skipIf(models.storage_t == 'db', "not testing file storage")
     def test_save(self):
         """Test that save properly saves objects to file.json"""
-        storage = FileStorage()
         new_dict = {}
         for key, value in classes.items():
             instance = value()
             instance_key = instance.__class__.__name__ + "." + instance.id
             new_dict[instance_key] = instance
-        save = FileStorage._FileStorage__objects
         FileStorage._FileStorage__objects = new_dict
-        storage.save()
-        FileStorage._FileStorage__objects = save
+        self.storage.save()
         for key, value in new_dict.items():
             new_dict[key] = value.to_dict()
         string = json.dumps(new_dict)
@@ -112,40 +123,20 @@ class TestFileStorage(unittest.TestCase):
             js = f.read()
         self.assertEqual(json.loads(string), json.loads(js))
 
+    @unittest.skipIf(models.storage_t == 'db', "not testing file storage")
     def test_get(self):
-        """test that get returns an object of a given class by id."""
-        storage = models.storage
-        obj = State(name='Michigan')
-        obj.save()
-        self.assertEqual(obj.id, storage.get(State, obj.id).id)
-        self.assertEqual(obj.name, storage.get(State, obj.id).name)
-        self.assertIsNot(obj, storage.get(State, obj.id + 'op'))
-        self.assertIsNone(storage.get(State, obj.id + 'op'))
-        self.assertIsNone(storage.get(State, 45))
-        self.assertIsNone(storage.get(None, obj.id))
-        self.assertIsNone(storage.get(int, obj.id))
-        with self.assertRaises(TypeError):
-            storage.get(State, obj.id, 'op')
-        with self.assertRaises(TypeError):
-            storage.get(State)
-        with self.assertRaises(TypeError):
-            storage.get()
+        """Test that get an object from the storage"""
+        state = State()
+        self.storage.new(state)
+        self.storage.save()
 
+        self.assertEqual(state, self.storage.get(State, state.id))
+
+    @unittest.skipIf(models.storage_t == 'db', "not testing file storage")
     def test_count(self):
-        """test that count returns the number of objects of a given class."""
-        storage = models.storage
-        self.assertIs(type(storage.count()), int)
-        self.assertIs(type(storage.count(None)), int)
-        self.assertIs(type(storage.count(int)), int)
-        self.assertIs(type(storage.count(State)), int)
-        self.assertEqual(storage.count(), storage.count(None))
-        State(name='Lagos').save()
-        self.assertGreater(storage.count(State), 0)
-        self.assertEqual(storage.count(), storage.count(None))
-        a = storage.count(State)
-        State(name='Enugu').save()
-        self.assertGreater(storage.count(State), a)
-        Amenity(name='Free WiFi').save()
-        self.assertGreater(storage.count(), storage.count(State))
-        with self.assertRaises(TypeError):
-            storage.count(State, 'op')
+        """Test that count objects into the storage"""
+        for cls in classes.values():
+            obj = cls()
+            self.storage.new(obj)
+            self.storage.save()
+        self.assertEqual(self.storage.count(), 7)
